@@ -1,41 +1,64 @@
 defmodule TryElixirWeb.PageLive do
   use TryElixirWeb, :live_view
 
+  alias TryElixir.CommandData
+
   @impl true
   def mount(_params, _session, socket) do
+    build_info = System.build_info()
     with {:ok, pid} <- TryElixir.Runners.start_terminal(socket.id) do
-      {:ok, socket |> assign(history: [], terminal: pid)}
+      {:ok, socket |> assign(build_info: build_info, history: [], command_data: CommandData.new(), command: "Test", terminal: pid)}
     else
-      {:error, {:already_started, pid}} -> {:ok, socket |> assign(history: [], terminal: pid)}
+      {:error, {:already_started, pid}} -> {:ok, socket |> assign(build_info: build_info, history: [], command_data: CommandData.new(), command: "Test", terminal: pid)}
     end
   end
 
   def handle_event("iex", %{"command" => "clear"}, socket) do
-    history = [] 
-    {:noreply, socket |> assign(:history, history)}
+    {:noreply, socket |> assign(history: [])}
   end
-  
-  def handle_event("iex", %{"command" => data}, socket) do
-    result = case TryElixir.Terminal.execute(socket.assigns.terminal, data) do
+
+  def handle_event("iex", %{"command" => command}, socket) do
+    command_data = CommandData.add(socket.assigns.command_data, command)
+    result = case TryElixir.Terminal.execute(socket.assigns.terminal, command) do
       {:ok, result} -> {:success, inspect(result)}
       {:error, kind, error, stack} -> 
         {:error, Exception.format(kind, error, stack)}
     end
-    history = socket.assigns.history ++ [{:command, "iex> #{data}"}, result]
-    {:noreply, socket |> assign(:history, history)}
+    history = socket.assigns.history ++ [{:command, "iex> #{command}"}, result]
+    {:noreply, socket |> assign(history: history, command_data: command_data, command: "")}
+  end
+
+  def handle_event("keyup", %{"key" => "ArrowUp"}, socket) do
+    {last_command, command_data} = CommandData.last_command(socket.assigns.command_data)
+    IO.inspect last_command
+    {:noreply, socket |> assign(command_data: command_data, command: last_command)}
+  end
+
+  def handle_event("keyup", %{"key" => "ArrowDown"}, socket) do
+    {previous_command, command_data} = CommandData.previous_command(socket.assigns.command_data)
+    {:noreply, socket |> assign(command_data: command_data, command: previous_command)}
+  end
+
+
+  def handle_event("keyup", _, socket) do
+    IO.inspect "no key"
+    {:noreply, socket}
   end
 
   def render(assigns) do
     ~L"""
-     <h4> Erlang/OTP 23 [erts-11.0] [source] [64-bit] [smp:8:8] [ds:8:8:10] [async-threads:1] [hipe] </h4> 
-     <%= for {class, text} <- @history do %>
+    <div phx-window-keyup="keyup">
+    <h4> Erlang/OTP <%= @build_info.otp_release %> Elixir <%= @build_info.build %> </h4> 
+    <%= for {class, text} <- @history do %>
        <div class="history <%= class %>"> 
         <%= format_text(text) %> 
        </div>
-     <% end %>
-     <form phx-submit="iex" >
-       iex&gt; <input class="terminal" type="text" name="command" autofocus />
-     </form>
+    <% end %>
+    <form phx-submit="iex" >
+      <label for="command"> iex&gt; </label>
+      <input class="terminal" type="text" name="command" autofocus="" value="<%= @command %>"/>
+    </form>
+    </div>
     """
   end
 

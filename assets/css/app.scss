@@ -8,7 +8,7 @@ body {
   /*);*/
   height: 100vh;
   color: white;
-  font: 1.3rem Inconsolata, monospace;
+  font: 1rem Inconsolata, monospace;
   text-shadow: 0 0 5px #C8C8C8;
 }
 
@@ -38,7 +38,9 @@ body {
   caret-color: white;
   background-color: transparent;
   color: white;
-  font: 1.3rem Inconsolata, monospace;
+  font: 1rem Inconsolata, monospace;
+  text-shadow: 0 0 5px #C8C8C8;
+  line-height: 1em;
 }
 
 .history {
