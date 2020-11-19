@@ -41,7 +41,6 @@ defmodule TryElixirWeb.PageLive do
 
 
   def handle_event("keyup", _, socket) do
-    IO.inspect "no key"
     {:noreply, socket}
   end
 
@@ -69,11 +68,11 @@ defmodule TryElixirWeb.PageLive do
     |> Enum.map(fn {t, c} -> 
       if c == 0 do
         ~E"""
-        <p style="line-height: 0em"> <%= t %> </p> 
+        <p class="terminal-error"> <%= t %> </p> 
         """
       else
         ~E"""
-        <p style="line-height: 0em; margin-left: 2em;"> <%= t %> </p> 
+        <p class="terminal-error" style="margin-left: 2em;"> <%= t %> </p> 
         """
       end
     end)

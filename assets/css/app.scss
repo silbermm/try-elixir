@@ -29,9 +29,10 @@ body {
   text-shadow: none;
 }
 
-.terminal {
+input, .terminal, .terminal:focus {
   border-color: transparent;
   caret-color: white;
+  outline: none;
   background-color: transparent;
   color: white;
   font: 1rem Inconsolata, monospace;
@@ -43,8 +44,13 @@ body {
   line-height: 1em;
 }
 
+.terminal-error {
+  margin-top: .25rem;
+  margin-bottom: 0;
+}
+
 .history.error {
-  color: red;
+   color: red;
 }
 
 .history.success {
