@@ -7,12 +7,17 @@ defmodule TryElixir.CommandData do
     %__MODULE__{
       commands: [],
       size: 0,
-      position: 0,
+      position: 0
     }
   end
 
   def add(command_data, command) do
-    %{command_data | size: command_data.size + 1, commands: [command | command_data.commands], position: 0}
+    %{
+      command_data
+      | size: command_data.size + 1,
+        commands: [command | command_data.commands],
+        position: 0
+    }
   end
 
   def last_command(command_data) do

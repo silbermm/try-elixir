@@ -3,7 +3,8 @@ defmodule TryElixir.Runners do
 
   alias TryElixir.Terminal
 
-  def start_link(init_arg), do: DynamicSupervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
+  def start_link(init_arg),
+    do: DynamicSupervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
 
   @impl true
   @doc false

@@ -6,11 +6,25 @@ defmodule TryElixirWeb.PageLive do
   @impl true
   def mount(_params, _session, socket) do
     build_info = System.build_info()
-    with {:ok, pid} <- TryElixir.Runners.start_terminal(socket.id) do
-      {:ok, socket |> assign(build_info: build_info, history: [], command_data: CommandData.new(), command: "", terminal: pid)}
-    else
-      {:error, {:already_started, pid}} -> {:ok, socket |> assign(build_info: build_info, history: [], command_data: CommandData.new(), command: "", terminal: pid)}
-    end
+
+    pid =
+      with {:ok, pid} <- TryElixir.Runners.start_terminal(socket.id) do
+        pid
+      else
+        {:error, {:already_started, pid}} -> pid
+      end
+
+    {:ok,
+     socket
+     |> assign(
+       build_info: build_info,
+       history: [],
+       command_data: CommandData.new(),
+       command: "",
+       terminal: pid,
+       iex_count: 1,
+       multiline: false
+     )}
   end
 
   def handle_event("iex", %{"command" => "clear"}, socket) do
@@ -19,26 +33,62 @@ defmodule TryElixirWeb.PageLive do
 
   def handle_event("iex", %{"command" => command}, socket) do
     command_data = CommandData.add(socket.assigns.command_data, command)
-    result = case TryElixir.Terminal.execute(socket.assigns.terminal, command) do
-      {:ok, result} -> {:success, inspect(result)}
-      {:error, kind, error, stack} -> 
-        {:error, Exception.format(kind, error, stack)}
+
+    case TryElixir.Terminal.execute(socket.assigns.terminal, command, socket.assigns.iex_count) do
+      {:ok, result} ->
+        result = {:success, inspect(result)}
+
+        history =
+          socket.assigns.history ++
+            [{:command, "iex(#{socket.assigns.iex_count})> #{command}"}, result]
+
+        {:noreply,
+         socket
+         |> assign(
+           history: history,
+           command_data: command_data,
+           command: "",
+           iex_count: socket.assigns.iex_count + 1,
+           multiline: false
+         )}
+
+      :continue ->
+        history =
+          socket.assigns.history ++
+            [{:command, "iex(#{socket.assigns.iex_count})> #{command}"}, ""]
+
+        {:noreply,
+         socket
+         |> assign(history: history, command_data: command_data, command: "", multiline: true)}
+
+      {:error, kind, error, stack} ->
+        result = {:error, Exception.format(kind, error, stack)}
+
+        history =
+          socket.assigns.history ++
+            [{:command, "iex(#{socket.assigns.iex_count})> #{command}"}, result]
+
+        {:noreply,
+         socket
+         |> assign(history: history, command_data: command_data, command: "", multiline: false)}
     end
-    history = socket.assigns.history ++ [{:command, "iex> #{command}"}, result]
-    {:noreply, socket |> assign(history: history, command_data: command_data, command: "")}
   end
 
   def handle_event("keyup", %{"key" => "ArrowUp"}, socket) do
     {last_command, command_data} = CommandData.last_command(socket.assigns.command_data)
-    {:noreply, push_event(socket |> assign(command_data: command_data), "cmd", %{command: last_command})}
-    #{:noreply, socket |> assign(command_data: command_data, command: last_command)}
+
+    {:noreply,
+     push_event(socket |> assign(command_data: command_data), "cmd", %{command: last_command})}
+
+    # {:noreply, socket |> assign(command_data: command_data, command: last_command)}
   end
 
   def handle_event("keyup", %{"key" => "ArrowDown"}, socket) do
     {previous_command, command_data} = CommandData.previous_command(socket.assigns.command_data)
-    {:noreply, push_event(socket |> assign(command_data: command_data), "cmd", %{command: previous_command})}
-  end
 
+    {:noreply,
+     push_event(socket |> assign(command_data: command_data), "cmd", %{command: previous_command})}
+  end
 
   def handle_event("keyup", _, socket) do
     {:noreply, socket}
@@ -54,7 +104,7 @@ defmodule TryElixirWeb.PageLive do
        </div>
     <% end %>
     <form phx-submit="iex" >
-      <label for="command"> iex(<%= @command_data.size %>)&gt; </label>
+      <label for="command"> <%= if @multiline do %>...<% else %>iex<% end %>(<%= @iex_count %>)&gt; </label>
       <input autocomplete="off" id="<%= @command_data.size %>" class="terminal" type="text" name="command" autofocus="" value="<%= @command %>" phx-hook="Focus" />
     </form>
     </div>
@@ -64,8 +114,8 @@ defmodule TryElixirWeb.PageLive do
   defp format_text(text) do
     text
     |> String.split("\n")
-    |> Enum.with_index
-    |> Enum.map(fn {t, c} -> 
+    |> Enum.with_index()
+    |> Enum.map(fn {t, c} ->
       if c == 0 do
         ~E"""
         <p class="terminal-error"> <%= t %> </p> 
